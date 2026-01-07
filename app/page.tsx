@@ -109,32 +109,67 @@ export default function Page(){
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Load / Save
+  // Load data from database on mount
   useEffect(()=>{
-    try {
-      const inc = JSON.parse(localStorage.getItem('budget_income') || '[]');
-      const exp = JSON.parse(localStorage.getItem('budget_expenses') || '[]');
-      const cat = JSON.parse(localStorage.getItem('budget_categories') || '[]');
-      setIncome(Array.isArray(inc) ? inc : []);
-      setExpenses(Array.isArray(exp) ? exp : []);
-      const catArr = Array.isArray(cat) && cat.length ? cat : [...DEFAULT_CATEGORIES];
-      const expCats = Array.isArray(exp) ? exp.map((e:any)=>e.category).filter(Boolean) : [];
-      setCategories(Array.from(new Set([...catArr, ...expCats])));
-    } catch {
-      setIncome([]); setExpenses([]); setCategories([...DEFAULT_CATEGORIES]);
-      toast("Local data was corrupted and has been reset.", "error", 4000);
-    }
-  }, []);
+    let cancelled = false;
+    async function loadData() {
+      try {
+        const [incomeRes, expensesRes, categoriesRes] = await Promise.all([
+          fetch('/api/income'),
+          fetch('/api/expenses'),
+          fetch('/api/categories')
+        ]);
 
-  useEffect(()=>{
-    try {
-      localStorage.setItem('budget_income', JSON.stringify(income));
-      localStorage.setItem('budget_expenses', JSON.stringify(expenses));
-      localStorage.setItem('budget_categories', JSON.stringify(categories));
-    } catch {
-      toast("Failed to save to local storage.", "error", 3500);
+        if (cancelled) return;
+
+        if (!incomeRes.ok || !expensesRes.ok) {
+          throw new Error('Failed to fetch data from server');
+        }
+
+        const incomeData = await incomeRes.json();
+        const expensesData = await expensesRes.json();
+        const categoriesData = categoriesRes.ok ? await categoriesRes.json() : [];
+
+        if (cancelled) return;
+
+        // Map database fields to frontend fields
+        const inc: IncomeRow[] = Array.isArray(incomeData) ? incomeData.map((r: any) => ({
+          id: r.id,
+          date: r.date,
+          desc: r.description || r.desc,
+          amount: Number(r.amount),
+          notes: r.notes || ''
+        })) : [];
+
+        const exp: ExpenseRow[] = Array.isArray(expensesData) ? expensesData.map((r: any) => ({
+          id: r.id,
+          date: r.date,
+          category: r.category,
+          desc: r.description || r.desc,
+          amount: Number(r.amount),
+          notes: r.notes || ''
+        })) : [];
+
+        setIncome(inc);
+        setExpenses(exp);
+
+        // Merge categories from database and expenses
+        const dbCats = Array.isArray(categoriesData) ? categoriesData.map((c: any) => c.name) : [];
+        const expCats = exp.map(e => e.category).filter(Boolean);
+        const allCats = Array.from(new Set([...DEFAULT_CATEGORIES, ...dbCats, ...expCats]));
+        setCategories(allCats);
+
+      } catch (err) {
+        console.error('Failed to load data from database:', err);
+        if (cancelled) return;
+        toast("Failed to load data from server. Please refresh the page.", "error", 5000);
+      }
     }
-  }, [income, expenses, categories]);
+
+    loadData();
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Forms refs
   const incomeDateRef = useRef<HTMLInputElement>(null);
@@ -196,7 +231,7 @@ export default function Page(){
     return fmtUSD.format(krwToUsd(v, rate));
   }, [expenseForm.amount, rate]);
 
-  function onAddIncome(e: React.FormEvent){
+  async function onAddIncome(e: React.FormEvent){
     e.preventDefault();
     const date = incomeForm.date.trim();
     const desc = incomeForm.desc.trim();
@@ -207,12 +242,28 @@ export default function Page(){
     if (!(amount > 0)) ok = false;
     if (!ok) { toast("Please fix the errors above.", "error", 3500); return; }
     const row: IncomeRow = { id: uid(), date, desc, amount, notes: incomeForm.notes.trim() };
-    setIncome(v => [...v, row]);
-    toast("Income added", "success");
-    setIncomeForm(f => ({ date: f.date, desc: "", amount: "", notes: "" }));
+
+    try {
+      const res = await fetch('/api/income', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(row)
+      });
+
+      if (!res.ok) {
+        throw new Error('Failed to save income');
+      }
+
+      setIncome(v => [...v, row]);
+      toast("Income added", "success");
+      setIncomeForm(f => ({ date: f.date, desc: "", amount: "", notes: "" }));
+    } catch (err) {
+      console.error('Error saving income:', err);
+      toast("Failed to save income to database.", "error", 4000);
+    }
   }
 
-  function onAddExpense(e: React.FormEvent){
+  async function onAddExpense(e: React.FormEvent){
     e.preventDefault();
     const date = expenseForm.date.trim();
     const category = expenseForm.category.trim();
@@ -225,9 +276,25 @@ export default function Page(){
     if (!(amount > 0)) ok = false;
     if (!ok) { toast("Please fix the errors above.", "error", 3500); return; }
     const row: ExpenseRow = { id: uid(), date, category, desc, amount, notes: expenseForm.notes.trim() };
-    setExpenses(v => [...v, row]);
-    toast("Expense added", "success");
-    setExpenseForm(f => ({ date: f.date, category: "", desc: "", amount: "", notes: "" }));
+
+    try {
+      const res = await fetch('/api/expenses', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(row)
+      });
+
+      if (!res.ok) {
+        throw new Error('Failed to save expense');
+      }
+
+      setExpenses(v => [...v, row]);
+      toast("Expense added", "success");
+      setExpenseForm(f => ({ date: f.date, category: "", desc: "", amount: "", notes: "" }));
+    } catch (err) {
+      console.error('Error saving expense:', err);
+      toast("Failed to save expense to database.", "error", 4000);
+    }
   }
 
   function onAddCategory(){
@@ -242,12 +309,28 @@ export default function Page(){
     toast('Category added', 'success');
   }
 
-  function onDelete(id: string, type: "income"|"expense"){
+  async function onDelete(id: string, type: "income"|"expense"){
     const ok = window.confirm('Delete this record? This cannot be undone.');
     if (!ok) return;
-    if (type === "income") setIncome(v => v.filter(r => r.id !== id));
-    else setExpenses(v => v.filter(r => r.id !== id));
-    toast("Record deleted", "success");
+
+    const endpoint = type === "income" ? '/api/income' : '/api/expenses';
+
+    try {
+      const res = await fetch(`${endpoint}?id=${encodeURIComponent(id)}`, {
+        method: 'DELETE'
+      });
+
+      if (!res.ok) {
+        throw new Error('Failed to delete record');
+      }
+
+      if (type === "income") setIncome(v => v.filter(r => r.id !== id));
+      else setExpenses(v => v.filter(r => r.id !== id));
+      toast("Record deleted", "success");
+    } catch (err) {
+      console.error('Error deleting record:', err);
+      toast("Failed to delete record from database.", "error", 4000);
+    }
   }
 
   // Export / Import / Clear
