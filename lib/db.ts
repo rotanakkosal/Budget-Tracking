@@ -40,9 +40,22 @@ export async function query(text: string, params?: any[]) {
 export async function initializeDatabase() {
   const pool = getPool();
 
+  // Create users table first (referenced by other tables)
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS users (
+      id VARCHAR(255) PRIMARY KEY,
+      email VARCHAR(255) UNIQUE NOT NULL,
+      password VARCHAR(255) NOT NULL,
+      name VARCHAR(255),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
   await pool.query(`
     CREATE TABLE IF NOT EXISTS income (
       id VARCHAR(255) PRIMARY KEY,
+      user_id VARCHAR(255) NOT NULL,
       date VARCHAR(50) NOT NULL,
       description TEXT NOT NULL,
       amount DECIMAL(15, 2) NOT NULL,
@@ -52,9 +65,20 @@ export async function initializeDatabase() {
     );
   `);
 
+  // Add user_id column if it doesn't exist (for existing tables)
+  await pool.query(`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='income' AND column_name='user_id') THEN
+        ALTER TABLE income ADD COLUMN user_id VARCHAR(255);
+      END IF;
+    END $$;
+  `);
+
   await pool.query(`
     CREATE TABLE IF NOT EXISTS expenses (
       id VARCHAR(255) PRIMARY KEY,
+      user_id VARCHAR(255) NOT NULL,
       date VARCHAR(50) NOT NULL,
       category VARCHAR(255) NOT NULL,
       description TEXT NOT NULL,
@@ -63,6 +87,16 @@ export async function initializeDatabase() {
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
+  `);
+
+  // Add user_id column if it doesn't exist (for existing tables)
+  await pool.query(`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='expenses' AND column_name='user_id') THEN
+        ALTER TABLE expenses ADD COLUMN user_id VARCHAR(255);
+      END IF;
+    END $$;
   `);
 
   await pool.query(`

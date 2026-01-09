@@ -28,10 +28,24 @@ async function initializeDatabase() {
   console.log('Creating database tables...');
 
   try {
+    // Create users table first (referenced by other tables)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        id VARCHAR(255) PRIMARY KEY,
+        email VARCHAR(255) UNIQUE NOT NULL,
+        password VARCHAR(255) NOT NULL,
+        name VARCHAR(255),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    console.log('✓ Users table created');
+
     // Create income table
     await pool.query(`
       CREATE TABLE IF NOT EXISTS income (
         id VARCHAR(255) PRIMARY KEY,
+        user_id VARCHAR(255),
         date VARCHAR(50) NOT NULL,
         description TEXT NOT NULL,
         amount DECIMAL(15, 2) NOT NULL,
@@ -40,12 +54,23 @@ async function initializeDatabase() {
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
+
+    // Add user_id column if it doesn't exist
+    await pool.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='income' AND column_name='user_id') THEN
+          ALTER TABLE income ADD COLUMN user_id VARCHAR(255);
+        END IF;
+      END $$;
+    `);
     console.log('✓ Income table created');
 
     // Create expenses table
     await pool.query(`
       CREATE TABLE IF NOT EXISTS expenses (
         id VARCHAR(255) PRIMARY KEY,
+        user_id VARCHAR(255),
         date VARCHAR(50) NOT NULL,
         category VARCHAR(255) NOT NULL,
         description TEXT NOT NULL,
@@ -54,6 +79,16 @@ async function initializeDatabase() {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
+    `);
+
+    // Add user_id column if it doesn't exist
+    await pool.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='expenses' AND column_name='user_id') THEN
+          ALTER TABLE expenses ADD COLUMN user_id VARCHAR(255);
+        END IF;
+      END $$;
     `);
     console.log('✓ Expenses table created');
 

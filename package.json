@@ -12,13 +12,16 @@
     "verify:setup": "tsx scripts/verify-setup.ts"
   },
   "dependencies": {
+    "bcryptjs": "^3.0.3",
     "dotenv": "^17.2.3",
     "next": "14.2.5",
+    "next-auth": "^4.24.13",
     "pg": "^8.16.3",
     "react": "18.2.0",
     "react-dom": "18.2.0"
   },
   "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
     "@types/node": "24.4.0",
     "@types/pg": "^8.15.5",
     "@types/react": "^18.2.6",
