@@ -32,6 +32,8 @@
   --pill-red-text: #fecaca;
   --loader-bg: #fff;
   --loader-ear: #fff;
+  --loader-eye: #000;
+  --loader-snout: #cfecf9;
 }
 
 /* Light theme */
@@ -58,6 +60,8 @@
   --pill-red-text: #dc2626;
   --loader-bg: #1e293b;
   --loader-ear: #1e293b;
+  --loader-eye: #fff;
+  --loader-snout: #e0f2fe;
 }
 
 * { box-sizing: border-box; }
@@ -262,14 +266,14 @@ tbody tr:hover { background: var(--table-hover); }
   left: 50%;
   top: 25px;
   transform: translateX(-50%);
-  background-image: radial-gradient(circle, #000 48%, transparent 55%),
-    radial-gradient(circle, #000 48%, transparent 55%),
+  background-image: radial-gradient(circle, var(--loader-eye) 48%, transparent 55%),
+    radial-gradient(circle, var(--loader-eye) 48%, transparent 55%),
     radial-gradient(circle, #fff 30%, transparent 45%),
-    radial-gradient(circle, #000 48%, transparent 51%),
-    linear-gradient(#000 20px, transparent 0),
-    linear-gradient(#cfecf9 60px, transparent 0),
-    radial-gradient(circle, #cfecf9 50%, transparent 51%),
-    radial-gradient(circle, #cfecf9 50%, transparent 51%);
+    radial-gradient(circle, var(--loader-eye) 48%, transparent 51%),
+    linear-gradient(var(--loader-eye) 20px, transparent 0),
+    linear-gradient(var(--loader-snout) 60px, transparent 0),
+    radial-gradient(circle, var(--loader-snout) 50%, transparent 51%),
+    radial-gradient(circle, var(--loader-snout) 50%, transparent 51%);
   background-repeat: no-repeat;
   background-size: 16px 16px, 16px 16px, 10px 10px, 42px 42px, 12px 3px,
     50px 25px, 70px 70px, 70px 70px;

@@ -282,9 +282,9 @@ export default function Page(){
   // EARLY RETURNS - After all hooks are declared
   if (status === 'loading') {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', background: '#0b1220', gap: '24px' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', background: 'var(--bg)', gap: '24px' }}>
         <span className="loader"></span>
-        <div style={{ color: '#9ca3af', fontSize: '1rem' }}>Loading...</div>
+        <div style={{ color: 'var(--text-dim)', fontSize: '1rem' }}>Loading...</div>
       </div>
     );
   }
