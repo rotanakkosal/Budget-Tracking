@@ -203,10 +203,15 @@ export default function Page(){
         setIncome(inc);
         setExpenses(exp);
 
-        const dbCats = Array.isArray(categoriesData) ? categoriesData.map((c: any) => c.name) : [];
+const dbCats = Array.isArray(categoriesData) ? categoriesData : [];
         const expCats = exp.map(e => e.category).filter(Boolean);
         const allCats = Array.from(new Set([...DEFAULT_CATEGORIES, ...dbCats, ...expCats]));
-        setCategories(allCats);
+        // Sort categories but keep "Other" at the end
+        const sortedCats = allCats.filter(c => c !== "Other").sort();
+        if (allCats.includes("Other")) {
+          sortedCats.push("Other");
+        }
+        setCategories(sortedCats);
 
       } catch (err) {
         console.error('Failed to load data from database:', err);
@@ -375,16 +380,53 @@ export default function Page(){
     }
   }
 
-  function onAddCategory() {
+async function refreshCategories() {
+    try {
+      const categoriesRes = await fetch('/api/categories');
+      if (categoriesRes.ok) {
+        const categoriesData = await categoriesRes.json();
+        const dbCats = Array.isArray(categoriesData) ? categoriesData : [];
+        const expCats = expenses.map(e => e.category).filter(Boolean);
+        const allCats = Array.from(new Set([...DEFAULT_CATEGORIES, ...dbCats, ...expCats]));
+        // Sort categories but keep "Other" at the end
+        const sortedCats = allCats.filter(c => c !== "Other").sort();
+        if (allCats.includes("Other")) {
+          sortedCats.push("Other");
+        }
+        setCategories(sortedCats);
+      }
+    } catch (err) {
+      console.error('Failed to refresh categories:', err);
+    }
+  }
+
+  async function onAddCategory() {
     const name = window.prompt('New category name')?.trim();
     if (!name) return;
-    if (categories.some(c => c.toLowerCase() === name.toLowerCase())) {
+    if (categories.some(c => c?.toLowerCase() === name.toLowerCase())) {
       toast('Category already exists', 'error', 3000);
       return;
     }
-    setCategories(c => [...c, name]);
-    setExpenseForm(f => ({ ...f, category: name }));
-    toast('Category added', 'success');
+
+    try {
+      const res = await fetch('/api/categories', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name })
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to create category');
+      }
+
+      await refreshCategories();
+      setExpenseForm(f => ({ ...f, category: name }));
+      toast('Category added', 'success');
+    } catch (err: any) {
+      console.error('Error creating category:', err);
+      toast(err.message || "Failed to create category in database.", "error", 4000);
+    }
   }
 
   async function onDelete(id: string, type: "income" | "expense") {
@@ -570,9 +612,9 @@ export default function Page(){
               <div>
                 <label htmlFor="expense-category">Category</label>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                  <select id="expense-category" value={expenseForm.category} onChange={(e) => setExpenseForm(f => ({ ...f, category: e.target.value }))}>
-                    <option value="">Select a category (optional)</option>
+<select id="expense-category" value={expenseForm.category} onChange={(e) => setExpenseForm(f => ({ ...f, category: e.target.value }))}>
                     {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                    <option value="">Select a category (optional)</option>
                   </select>
                   <button type="button" className="btn btn-sm" onClick={onAddCategory} aria-label="Add category">Add</button>
                 </div>
